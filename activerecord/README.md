@@ -1,24 +1,35 @@
-# README
+# Cerbos + ActiveRecord ORM Adapter
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+An adapater library that takes a [Cerbos](https://cerbos.dev) Query Plan ([PlanResources API](https://docs.cerbos.dev/cerbos/latest/api/index.html#resources-query-plan)) response and converts it into an [ActiveRecord](https://github.com/rails/rails/tree/main/activerecord) relation object. This is designed to work alongside a project using the [Cerbos Ruby SDK](https://github.com/cerbos/cerbos-sdk-ruby).
 
-Things you may want to cover:
+The following conditions are supported: `and`, `or`, `eq`, `ne`, `lt`, `gt`, `lte`, `gte` and `in`.
 
-* Ruby version
+Not Supported:
 
-* System dependencies
+- `every`
+- `contains`
+- `search`
+- `mode`
+- `startsWith`
+- `endsWith`
+- `isSet`
+- Scalar filters
+- Atomic number operations
 
-* Configuration
+## Requirements
+- Cerbos > v0.16
+- `@cerbos/http` or `@cerbos/grpc` client
 
-* Database creation
+## Usage
 
-* Database initialization
+```
+TODO: gem install support
+```
 
-* How to run the test suite
+Use the `Cerbos::QueryPlanAdapater` class:
 
-* Services (job queues, cache servers, search engines, etc.)
+```ruby
+TODO:  example
+```
 
-* Deployment instructions
-
-* ...
+Usage is similar to the Cerbos [Prisma](https://docs.cerbos.dev/cerbos/latest/recipes/orm/prisma/index.html) and [SQLAlchemy](https://docs.cerbos.dev/cerbos/latest/recipes/orm/sqlalchemy/index.html) adapters.
