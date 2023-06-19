@@ -10,12 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2023_06_09_014257) do
-  create_table "foos", id: :string, force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-  end
-
+ActiveRecord::Schema[7.0].define(version: 2023_06_10_062929) do
   create_table "resources", id: :string, force: :cascade do |t|
     t.string "a_string"
     t.integer "a_number"
@@ -31,6 +26,14 @@ ActiveRecord::Schema[7.0].define(version: 2023_06_09_014257) do
     t.string "resource_id"
     t.index ["resource_id"], name: "index_resources_users_on_resource_id"
     t.index ["user_id"], name: "index_resources_users_on_user_id"
+  end
+
+  create_table "user_details", id: :string, force: :cascade do |t|
+    t.string "a_string"
+    t.string "user_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_user_details_on_user_id"
   end
 
   create_table "users", id: :string, force: :cascade do |t|

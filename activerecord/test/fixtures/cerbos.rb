@@ -1,3 +1,4 @@
+
 module Fixtures
   # Test data matching the suite for @cerbos/orm-prisma
   # https://github.com/cerbos/query-plan-adapters/blob/main/prisma/src/index.test.ts
@@ -7,13 +8,25 @@ module Fixtures
         id: "user1",
         a_string: "string",
         a_number: 1,
-        a_bool: true)
+        a_bool: true
+      )
+
+      user1.create_user_detail!(
+        id: "detail1",
+        a_string: "detail1"
+      )
 
       user2 = User.create!(
         id: "user2",
         a_string: "string",
         a_number: 2,
-        a_bool: true)
+        a_bool: true
+      )
+
+      user2.create_user_detail!(
+        id: "detail2",
+        a_string: "detail2"
+      )
 
       Resource.create!(
         id: "resource1",
