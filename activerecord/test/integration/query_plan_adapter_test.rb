@@ -248,7 +248,7 @@ class QueryPlanAdapterTest < ActiveSupport::TestCase
     adapter = Cerbos::QueryPlanAdapter.new(
       plan_resources: query_plan, model: Resource, field_mapping: {}, relationship_mapping: {
         "request.resource.attr.ownedBy" => {
-          relation: "users",
+          relation: :users,
           field: :id
       }
     })
@@ -270,7 +270,7 @@ class QueryPlanAdapterTest < ActiveSupport::TestCase
     adapter = Cerbos::QueryPlanAdapter.new(
       plan_resources: query_plan, model: Resource, field_mapping: {}, relationship_mapping: {
       "request.resource.attr.ownedBy" => {
-        relation: "users",
+        relation: :users,
         field: :id
       }
     })
@@ -293,7 +293,7 @@ class QueryPlanAdapterTest < ActiveSupport::TestCase
         plan_resources: query_plan, model: Resource, field_mapping: {}, logger: Logger.new(STDOUT),
         relationship_mapping: {
           "request.resource.attr.createdBy" => {
-            relation: "creator",
+            relation: :creator,
             field: :id
           }
       })
@@ -332,8 +332,8 @@ class QueryPlanAdapterTest < ActiveSupport::TestCase
     adapter = Cerbos::QueryPlanAdapter.new(
       plan_resources: query_plan, model: Resource, field_mapping: {}, relationship_mapping: {
       "request.resource.attr.createdBy" => {
-        "relation": "creator",
-        "field": "id"
+        relation: :creator,
+        field: "id"
       }
     })
 
@@ -341,6 +341,95 @@ class QueryPlanAdapterTest < ActiveSupport::TestCase
     actual = adapter.to_query
     assert_equal expected.to_sql, actual.to_sql
     assert_equal expected.pluck(:id).sort, actual.pluck(:id).sort
+  end
+
+  test "conditional - deep relation equal (relation join with column)" do
+    query_plan = cerbos.plan_resources(
+      principal: { id: "user1", attributes: { detail_id: "detail1" }, roles: ["USER"] },
+      resource: { kind: "resource" },
+      action: "deep-relation-equal"
+    )
+
+    # relation join with column
+    adapter = Cerbos::QueryPlanAdapter.new(
+      plan_resources: query_plan, model: Resource, field_mapping: {}, relationship_mapping: {
+      "request.resource.attr.creator.detail.string" => {
+        relation: { creator: :user_detail },
+        column: "user_details.a_string"
+      }
+    })
+
+    expected = Resource.joins(creator: :user_detail).where({ "user_details.a_string" => 'detail1' })
+    actual = adapter.to_query
+    assert_equal expected.to_sql, actual.to_sql
+    assert_equal ["resource1", "resource3"], actual.pluck(:id).sort
+  end
+
+  test "conditional - deep relation equal (relation field)" do
+    query_plan = cerbos.plan_resources(
+      principal: { id: "user1", attributes: { detail_id: "detail1" }, roles: ["USER"] },
+      resource: { kind: "resource" },
+      action: "deep-relation-equal"
+    )
+
+    # relation using field only -- the caller chains to_query w/ whatever join techniques needed
+    adapter = Cerbos::QueryPlanAdapter.new(
+      plan_resources: query_plan, model: Resource, logger: Logger.new(STDOUT), field_mapping: {},
+       relationship_mapping: {
+      "request.resource.attr.creator.detail.string" => {
+        field: {creator: { user_details: :a_string }}
+      },
+    })
+
+    expected = Resource.joins(creator: :user_detail).where(creator: { user_details: { a_string: 'detail1' }})
+    actual = adapter.to_query.joins(creator: :user_detail)
+    assert_equal expected.to_sql, actual.to_sql
+    assert_equal ["resource1", "resource3"], actual.pluck(:id).sort
+  end
+
+  test "conditional - deep relation equal (relation sql with column)" do
+    query_plan = cerbos.plan_resources(
+      principal: { id: "user1", attributes: { detail_id: "detail1" }, roles: ["USER"] },
+      resource: { kind: "resource" },
+      action: "deep-relation-equal"
+    )
+
+    # relation sql with column
+    adapter = Cerbos::QueryPlanAdapter.new(
+      plan_resources: query_plan, model: Resource, logger: Logger.new(STDOUT), field_mapping: {},
+      relationship_mapping: {
+        "request.resource.attr.creator.detail.string" => {
+          column: "user_detail.a_string",
+          relation: <<~SQL
+            JOIN users creator ON creator.id = resources.creator_id
+            JOIN user_details user_detail ON user_detail.user_id = creator.id
+          SQL
+        },
+      })
+
+    expected = <<~SQL
+      SELECT "resources".* FROM "resources" 
+        JOIN users creator ON creator.id = resources.creator_id 
+        JOIN user_details user_detail ON user_detail.user_id = creator.id 
+      WHERE "user_detail"."a_string" = 'detail1'
+    SQL
+
+    actual = adapter.to_query
+    assert_equal expected.gsub("\n", " ").squeeze(" ").strip, actual.to_sql
+    assert_equal ["resource1", "resource3"], actual.pluck(:id).sort
+  end
+
+  test "bury" do
+    def bury(hash, nested_value)
+      Cerbos::QueryPlanAdapter.new(plan_resources: nil, model: nil).send(:bury, hash, nested_value)
+    end
+
+    assert_equal({a: :b}, bury(:a, :b))
+    assert_equal({a: {b: :c}}, bury({a: :b}, :c))
+    assert_equal({a: {b: {c: :d}}}, bury({a: :b}, {c: :d}))
+    assert_equal({a: {b: {c: {d: :e}}}}, bury({a: {b: {c: :d}}}, :e))
+    assert_equal({a: :b}, bury({}, {a: :b}))
+    assert_equal((:a), bury({}, :a))
   end
 
 end

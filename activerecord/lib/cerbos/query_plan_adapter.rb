@@ -84,6 +84,7 @@ module Cerbos
       logger.info(operation, &block) if logger
     end
 
+    # returns an ActiveRecord::Relation or an Arel::Node for the given +Cerbos::Output::PlanResources::Expression+
     def map_operands(operand)
       operator = operand.operator
       operands = operand.operands
@@ -129,16 +130,53 @@ module Cerbos
       relation = relationship_mapping[variable]
 
       if relation
-        join_model = relation[:relation].to_sym
-        column =  relation[:field].to_s
-        model.joins(join_model).where( join_model => { column => value } )
+        # join_model accepts the same format as model.joins (SQL string, symbols, or hash with symbols),
+        # or it can be omitted so that the caller can chain `to_query` with any custom join logic needed
+        join_model = relation[:relation] || {}
+        join_model = join_model.gsub("\n", " ").squeeze(" ") if join_model.is_a?(String)
+
+        # one of column or field must be given (field is a symbol or hash with symbols, column is a SQL string)
+        column = relation[:column]
+        field =  relation[:field]
+        raise "Missing column or field in the relationship mapping #{relation}" if (column.blank? && field.blank?)
+
+        model.joins(join_model).where(column ? { column => value } : bury(bury(join_model, field), value))
       else
         column = field_mapping[variable]
-        raise "Attribute #{variable} does not exist in the attribute field mapping: #{field_mapping}" if column.blank?
+        raise "Attribute #{variable} is not mapped in the field_mapping or relationship_mapping" if column.blank?
 
         # operator handlers here are leaf nodes of the recursion
         get_operator_fn(operator, column, value)
       end
     end
+
+    # buries nested_value inside hash, eg: `bury({a: :b}, {c: :d})` returns `{a: {b: {c: :d}}}`
+    def bury(hash, nested_value)
+      # recursively flatten all the keys
+      val = hash
+      keys = []
+      unless hash.empty?
+        while (val.is_a?(Hash)) do
+          k, val = val.first
+          keys << k
+        end
+        keys << val
+      end
+
+      # reconstruct including nested_value
+      if keys.empty?
+        nested_value
+      else
+        result = h = {}
+        while !keys.empty?
+          k = keys.shift
+          more = keys.length > 0
+          h[k] = more ? {} : nested_value
+          h = h[k] if more
+        end
+        result
+      end
+    end
+
   end
 end

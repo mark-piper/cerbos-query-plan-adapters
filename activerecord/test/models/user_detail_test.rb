@@ -6,6 +6,6 @@ class UserDetailTest < ActiveSupport::TestCase
   end
 
   test "fixture" do
-    assert_equal ["detail1", "detail2"], UserDetail.all.pluck(:id)
+    assert_equal ["detail1", "detail2"], [User.first.user_detail.a_string, User.second.user_detail.a_string]
   end
 end

@@ -174,3 +174,13 @@ resourcePolicy:
         match:
           expr: >
             !(request.resource.attr.createdBy == P.id)
+
+    - actions:
+        - "deep-relation-equal"
+      effect: EFFECT_ALLOW
+      roles:
+        - USER
+      condition:
+        match:
+          expr:
+            request.resource.attr.creator.detail.string == P.attr.detail_id
