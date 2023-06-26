@@ -1,6 +1,23 @@
 module Cerbos
   class QueryPlanAdapter
-    attr_accessor :plan_resources, :model, :field_mapping, :relationship_mapping, :logger
+    attr_accessor :plan_resources, :model, :field_mapping, :relationship_mapping, :logger, :annotate
+
+    class Configuration
+      attr_accessor :logger, :annotate
+
+      def initialize
+        @logger = nil
+        @annotate = true
+      end
+    end
+
+    def self.configure
+      yield config if block_given?
+    end
+
+    def self.config
+      @@config ||= Configuration.new
+    end
 
     OPERATOR_MAP = { # c: column, v: value
         "eq" => ->(c, v, model) { model.arel_table[c].eq(v) },
@@ -15,12 +32,14 @@ module Cerbos
     # Initialize an adapter to convert a Cerbos query plan (from a `plan_resources` call) into
     # an ActiveRecord query.
     # TODO: decide names field_mapper, attr_map, etc
-    def initialize(plan_resources:, model:, field_mapping: {}, relationship_mapping: {}, logger: nil)
+    def initialize(plan_resources:, model:, field_mapping: {}, relationship_mapping: {},
+                   logger: config.logger, annotate: config.annotate)
       @plan_resources = plan_resources
       @model = model
       @field_mapping = field_mapping
       @relationship_mapping = relationship_mapping
       @logger = logger
+      @annotate = annotate
     end
 
     # Returns an ActiveRecord query for the Cerbos query plan.
@@ -43,16 +62,28 @@ module Cerbos
         else
           raise "Invalid Cerbos query plan: #{plan_resources.pretty_inspect}"
         end
-      log(:to_query) { query.to_sql }
+
+      if annotate
+        query = query.annotate("#<#{self.class.name} @model=#{model.name} @kind=#{plan_resources.kind}>")
+      end
+
+      if logger
+        log(:to_query) { query.to_sql }
+      end
+
       query
     end
 
     def inspect
-      fields = [:field_mapping, :relationship_mapping, :plan_resources].map { |f| "@#{f}:" << send(f).inspect }
+      fields = [:field_mapping, :relationship_mapping, :plan_resources].map { |f| "@#{f}=" << send(f).inspect }
       "#<#{self.class.name}:#{object_id} @model=#{model.name} #{fields.join(' ')}>"
     end
 
     private
+
+    def config
+      self.class.config
+    end
 
     def expression?(operand)
       operand.is_a?(Cerbos::Output::PlanResources::Expression)

@@ -11,6 +11,9 @@ class QueryPlanAdapterTest < ActiveSupport::TestCase
 
   setup do
     Fixtures::Cerbos.setup!
+    Cerbos::QueryPlanAdapter.configure do |config|
+      config.annotate = false
+    end
   end
 
   test "cerbos connection" do
@@ -20,6 +23,14 @@ class QueryPlanAdapterTest < ActiveSupport::TestCase
     )
 
     assert_equal decision.allow?('always-allow'), true
+  end
+
+  test "initialize" do
+    adapter = Cerbos::QueryPlanAdapter.new(plan_resources: :fake_plan, model: Resource)
+    assert_equal :fake_plan, adapter.plan_resources
+    assert_equal Resource, adapter.model
+    assert_equal false, adapter.annotate
+    assert_nil adapter.logger
   end
 
   test "always allowed" do
@@ -396,7 +407,11 @@ class QueryPlanAdapterTest < ActiveSupport::TestCase
 
     # relation sql with column
     adapter = Cerbos::QueryPlanAdapter.new(
-      plan_resources: query_plan, model: Resource, logger: Logger.new(STDOUT), field_mapping: {},
+      plan_resources: query_plan,
+      model: Resource,
+      logger: Logger.new(STDOUT),
+      annotate: true,
+      field_mapping: {},
       relationship_mapping: {
         "request.resource.attr.creator.detail.string" => {
           column: "user_detail.a_string",
@@ -412,6 +427,7 @@ class QueryPlanAdapterTest < ActiveSupport::TestCase
         JOIN users creator ON creator.id = resources.creator_id 
         JOIN user_details user_detail ON user_detail.user_id = creator.id 
       WHERE "user_detail"."a_string" = 'detail1'
+      /* #<Cerbos::QueryPlanAdapter @model=Resource @kind=KIND_CONDITIONAL> */
     SQL
 
     actual = adapter.to_query
