@@ -19,7 +19,8 @@ module Cerbos
       @@config ||= Configuration.new
     end
 
-    OPERATOR_MAP = { # c: column, v: value
+    OPERATOR_MAP = {
+        # c: column, v: value
         "eq" => ->(c, v, model) { model.arel_table[c].eq(v) },
         "ne" => ->(c, v, model) { model.arel_table[c].not_eq(v) },
         "in" => ->(c, v, model) { model.arel_table[c].in(v) },
@@ -28,6 +29,9 @@ module Cerbos
         "ge" => ->(c, v, model) { model.arel_table[c].gteq(v) },
         "le" => ->(c, v, model) { model.arel_table[c].lteq(v) },
     }.freeze
+
+    REQUEST_RESOURCE_PATTERN = /^request\.resource/.freeze
+    R_SHORTHAND = 'R'.freeze
 
     # Initialize an adapter to convert a Cerbos query plan (from a `plan_resources` call) into
     # an ActiveRecord query.
@@ -97,12 +101,24 @@ module Cerbos
       operand.is_a?(Cerbos::Output::PlanResources::Expression::Variable)
     end
 
+    def shorthand(variable)
+      variable.to_s.sub(REQUEST_RESOURCE_PATTERN, R_SHORTHAND)
+    end
+
     def get_operand_variable(operands)
       operands.find { |o| variable?(o) }&.name
     end
 
     def get_operand_value(operands)
       operands.find { |o| value?(o) }&.value
+    end
+
+    def get_field_mapping(variable)
+      field_mapping[variable.to_s] || field_mapping[shorthand(variable.to_s)]
+    end
+
+    def get_relationship_mapping(variable)
+      relationship_mapping[variable.to_s] || relationship_mapping[shorthand(variable.to_s)]
     end
 
     def get_operator_fn(operator, column, value)
@@ -158,7 +174,7 @@ module Cerbos
 
       variable = get_operand_variable(operands)
       value = get_operand_value(operands)
-      relation = relationship_mapping[variable]
+      relation = get_relationship_mapping(variable)
 
       if relation
         # join_model accepts the same format as model.joins (SQL string, symbols, or hash with symbols),
@@ -173,7 +189,7 @@ module Cerbos
 
         model.joins(join_model).where(column ? { column => value } : bury(bury(join_model, field), value))
       else
-        column = field_mapping[variable]
+        column = get_field_mapping(variable)
         raise "Attribute #{variable} is not mapped in the field_mapping or relationship_mapping" if column.blank?
 
         # operator handlers here are leaf nodes of the recursion
